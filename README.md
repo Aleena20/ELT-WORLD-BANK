@@ -31,7 +31,7 @@ The data used in this project is sourced from the World Bank's historical loan d
 * **Transformation:** Data cleaning, manipulation, and feature engineering using Pandas.
 * **Orchestration:** Task scheduling and automation using cron jobs.
 
-## # 💬 Tools & Technologies
+## 💬 Tools & Technologies
 
 * **cron jobs:** Manages the orchestration and automation of the ELT pipeline.
 * **Pandas:** Used for data transformation, cleaning, and enrichment.
