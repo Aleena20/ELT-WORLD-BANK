@@ -14,9 +14,6 @@ The primary goal of this project is to illustrate how to design and orchestrate 
 
 This project serves as a practical example of leveraging modern data engineering practices and tools to automate workflows and ensure efficient data handling in a cloud environment.
 
-```bash
-pip install foobar
-```
 ## 🚦 About the Data
 
 The data used in this project is sourced from the World Bank's historical loan data, which tracks loans provided to countries globally. Specifically, it includes information about loans made by the International Bank for Reconstruction and Development (IBRD). These loans are public or publicly guaranteed and are extended to member countries. The data is in USD and uses historical exchange rates.
