@@ -1,0 +1,7 @@
+pandas
+wbgapi
+sqlalchemy
+pyodbc
+python-dotenv
+scikit-learn
+schedule

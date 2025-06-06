@@ -1,0 +1,19 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+*.pbix
+data/
+logs/
+*.env
+
+# Azure SQL connection
+AZURE_SQL_SERVER=elt-world-bank.database.windows.net
+AZURE_SQL_DATABASE=ELT
+AZURE_SQL_USERNAME=CloudSA648a5ceb
+AZURE_SQL_PASSWORD=Urno9@$$
+AZURE_SQL_DRIVER=ODBC Driver 17 for SQL Server
+
+# Logging
+LOG_DIR=logs
+LOG_LEVEL=INFO
+
+# World Bank Indicator
+WB_INDICATOR=GC.DOD.TOTL.GD.ZS
