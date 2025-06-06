@@ -1,0 +1,52 @@
+
+# Postfix Main Configuration File for Gmail SMTP Relay
+
+# Basic settings
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+append_dot_mydomain = no
+readme_directory = no
+compatibility_level = 3.6
+
+# TLS settings (using default snakeoil certs for now)
+smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_tls_security_level = may
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+smtp_tls_CApath = /etc/ssl/certs
+
+# Enabling TLS and authentication for Gmail relay
+smtp_use_tls = yes
+smtp_tls_security_level = may
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+
+# Gmail SMTP relay configuration
+relayhost = [smtp.gmail.com]:587
+
+# Myhostname and origin
+myhostname = AleenaPC.localdomain
+myorigin = /etc/mailname
+
+# Alias maps
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+
+# Mail relay rules
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+
+
+# --- Additional Configuration Files ---
+
+# /etc/postfix/sasl_passwd
+# [smtp.gmail.com]:587 your.email@gmail.com:your_app_password
+
+# Replace with your actual email and App Password (if 2FA is enabled)
+
+# --- Commands to Run ---
+# sudo postmap /etc/postfix/sasl_passwd
+# sudo chown root:root /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
+# sudo chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
+# sudo systemctl restart postfix
