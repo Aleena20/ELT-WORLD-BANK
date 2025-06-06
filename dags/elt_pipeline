@@ -1,0 +1,512 @@
+# Bonus: create & activate virtual environment in python
+  python -m venv venv
+  source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# installing necessary packages
+  pip install pandas requests sqlalchemy pyodbc
+
+# Install ODBC Driver 17+
+
+# Step One: Extract Data from the World Bank API
+  import pandas as pd
+  import zipfile
+
+    #Replace with your actual file path
+     zip_path = r"C:\Users\aleen\venv\API_GC.DOD.TOTL.GD.ZS_DS2_en_csv_v2_87867.zip"
+
+    #Open the ZIP and read the correct CSV file
+     with zipfile.ZipFile(zip_path, 'r') as z:
+    # List files in the zip to confirm names
+      print("Files inside ZIP:", z.namelist())
+
+    # Open the actual data CSV inside the ZIP
+      with z.open('API_GC.DOD.TOTL.GD.ZS_DS2_en_csv_v2_87867.csv') as f:
+        df = pd.read_csv(f, skiprows=4)  # World Bank data usually has 4 metadata rows
+
+    # Show the first 5 rows
+       print(df.head())
+    # List of countries to analyze
+      countries = ['India', 'United States', 'China', 'Japan', 'Germany']
+
+# Step Two: Data Cleaning & Preparation 
+ # Plot for each selected country
+  plt.figure(figsize=(12, 7))
+
+  for country in countries:
+    country_data = df[df['Country Name'] == country]
+    if country_data.empty:
+        print(f"No data for {country}")
+        continue
+
+    # Drop metadata columns and reshape
+      country_data = country_data.drop(columns=['Country Code', 'Indicator Name', 'Indicator Code'])
+      country_data = country_data.set_index('Country Name').T.reset_index()
+      country_data.columns = ['Year', 'Debt (% of GDP)']
+      country_data = country_data[country_data['Year'].str.isnumeric()]
+      country_data['Year'] = country_data['Year'].astype(int)
+      country_data['Debt (% of GDP)'] = pd.to_numeric(country_data['Debt (% of GDP)'], errors='coerce')
+
+      plt.plot(country_data['Year'], country_data['Debt (% of GDP)'], label=country)
+
+    # Final plot formatting
+      plt.title("Government Debt as % of GDP (Selected Countries)")
+      plt.xlabel("Year")
+      plt.ylabel("Debt (% of GDP)")
+      plt.legend()
+      plt.grid(True)
+      plt.tight_layout()
+      plt.show()
+
+# Step Three: Connect to Azure SQL Database
+  
+  #Create SQLAlchemy engine
+   from sqlalchemy import create_engine
+
+   server = 'elt-world-bank.database.windows.net'
+   database = 'ELT'
+   username = 'CloudSA648a5ceb'
+   password = 'Urno9@$$'
+   driver = 'ODBC Driver 17 for SQL Server'
+
+   connection_string = f"mssql+pyodbc://{username}:{password}@{server}:1433/{database}?driver={driver}"
+   engine = create_engine(connection_string)
+   import pyodbc
+
+   conn_str = (
+    "DRIVER={ODBC Driver 17 for SQL Server};"
+    "SERVER=tcp:elt-world-bank.database.windows.net,1433;"
+    "DATABASE=ELT;"
+    "UID=CloudSA648a5ceb@elt-world-bank;"
+    "PWD=Urno9@$$;"
+    "Encrypt=yes;"
+    "TrustServerCertificate=no;"
+    "Connection Timeout=60;"
+     )
+
+    conn = pyodbc.connect(conn_str)
+    print("Connection successful.")
+#Reading columns
+  pd.read_sql("SELECT name FROM sys.tables", con=engine)
+#Reuploading as debt_percent-gdp
+  df_long.to_sql('debt_percent_gdp', con=engine, if_exists='replace', index=False)
+  print("✅ Re-uploaded as 'debt_percent_gdp'")
+
+
+ #Load data into Azure SQL table
+   df_long.to_sql('debt_percent_gdp', con=engine, if_exists='replace', index=False)
+    print("✅ Data uploaded to Azure SQL successfully!")
+    with engine.connect() as conn:
+      result = conn.execute("SELECT TOP 5 * FROM debt_percent_gdp")
+       for row in result:
+         print(row)
+
+  #Testing my Azure SQL Activation
+    import pandas as pd
+    import sqlalchemy
+
+    # Assuming engine is already defined elsewhere in your code
+    # If not, you would need to create it first:
+    # engine = sqlalchemy.create_engine('your_connection_string')
+
+     # Roll back any pending transactions
+        if hasattr(engine, 'dispose'):
+          engine.dispose()  # This closes all connections and rolls back transactions
+
+       # Alternative approach if dispose() doesn't work
+          try:
+            with engine.connect() as connection:
+            connection.execute(sqlalchemy.text("ROLLBACK"))
+            except:
+               pass  # If this fails, we'll try the query anyway
+
+     # Now try your query
+       query = "SELECT TOP 5 * FROM debt_percent_gdp"
+       test_df = pd.read_sql(query, con=engine)
+       print(test_df)
+# Some SQL queries for the data
+  import pandas as pd
+  from sqlalchemy import text
+
+  # List countries with highest debt in 2020:
+    query = """
+    SELECT [Country Name], [Year], [DebtPercentGDP]
+    FROM debt_percent_gdp
+    WHERE [Year] >= '2010'
+    ORDER BY [DebtPercentGDP] DESC
+    """
+
+   # Run the query using your SQLAlchemy engine
+     df = pd.read_sql(text(query), con=engine)
+
+   # Preview the result
+     print("✅ Query successful!")
+     df.head()
+  
+  # Average debt by country over all years:
+    from sqlalchemy import text
+
+    query_avg_debt = """
+    SELECT [Country Name], AVG([DebtPercentGDP]) AS AvgDebt
+    FROM debt_percent_gdp
+    GROUP BY [Country Name]
+    ORDER BY AvgDebt DESC
+    """
+
+    avg_debt_df = pd.read_sql(text(query_avg_debt), con=engine)
+    avg_debt_df.head()
+
+  #Trend of debt for a specific country (e.g., Germany):
+    query_germany_trend = """
+    SELECT [Year], [DebtPercentGDP]
+    FROM debt_percent_gdp
+    WHERE [Country Name] = 'Germany'
+    ORDER BY [Year]
+    """
+    germany_debt_df = pd.read_sql(text(query_germany_trend), con=engine)
+    germany_debt_df.head()
+
+# Step Four: Logging & Scheduling
+  pip install wbdata pandas sqlalchemy pyodbc
+  import logging
+  from datetime import datetime
+
+ # Configure logging
+   log_filename = f"elt_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+   logging.basicConfig(filename=log_filename,
+                       level=logging.INFO,
+                       format='%(asctime)s - %(levelname)s - %(message)s')
+
+   logging.info("ELT script started")
+
+ # testing API connectivity
+   import requests
+
+    url = "http://api.worldbank.org/v2/country?incomeLevel=HIC&format=json"
+    response = requests.get(url)
+
+    print("Status code:", response.status_code)
+    print("Content:", response.text[:500])  # Print part of response
+
+   import wbdata
+   import pandas as pd
+   from datetime import datetime
+   import logging
+
+ # Configure logging
+ logging.basicConfig(level=logging.INFO)
+ logger = logging.getLogger(__name__)
+
+ try:
+     # Retrieve countries with High Income level
+       countries = wbdata.get_country(incomelevel="HIC")
+       country_codes = [c['id'] for c in countries]
+
+     # Define the indicator
+       indicator = {'GC.DOD.TOTL.GD.ZS': 'DebtPercentGDP'}
+
+     # Set the date range
+       data_date = (datetime(2000, 1, 1), datetime(2020, 1, 1))
+
+     # Fetch the data
+       df = wbdata.get_dataframe(indicator, country=country_codes, data_date=data_date)
+       print(df.head())
+
+       except Exception as e:
+      logger.error(f"An error occurred: {e}")
+
+  import logging
+
+  # Configure logging
+    logging.basicConfig(
+        filename='data_extraction.log',
+        level=logging.INFO,
+        format='%(asctime)s:%(levelname)s:%(message)s'
+      )
+
+    logging.info('Data extraction started.')
+
+  # Your data extraction code here
+
+    logging.info('Data extraction completed successfully.')
+
+  import logging
+  from datetime import datetime
+
+  # Set up logging
+    logging.basicConfig(
+        filename="extract_log.txt",
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+     )
+
+    logging.info("=== Extract Step Started ===")
+
+ import wbdata
+ import pandas as pd
+
+ def extract_debt_percent_gdp(start_year=2010, end_year=2023):
+     try:
+         logging.info("Attempting to fetch high income countries...")
+         countries = wbdata.get_countries(incomelevel="HIC")  # High income
+         logging.info("Successfully fetched high income countries.")
+     except Exception as e:
+         logging.warning(f"Failed to get high income countries: {e}")
+         logging.info("Falling back to all countries (excluding aggregates).")
+         countries = wbdata.get_countries()
+
+    # Filter country codes (exclude aggregates)
+      country_codes = [c['id'] for c in countries if c['region']['id'] != 'NA']
+      logging.info(f"Fetched {len(country_codes)} valid country codes.")
+
+    # Define indicator: Central government debt (% of GDP)
+      indicator = {"GC.DOD.TOTL.GD.ZS": "DebtPercentGDP"}
+
+      try:
+          data = wbdata.get_dataframe(
+              indicator,
+              country=country_codes,
+              data_date=(datetime(start_year, 1, 1), datetime(end_year, 1, 1)),
+              convert_date=True
+          )
+          logging.info(f"Successfully extracted data for years {start_year}-{end_year}.")
+          return data.reset_index()
+      except Exception as e:
+          logging.error(f"Data extraction failed: {e}")
+          return pd.DataFrame()
+
+  import pyodbc
+
+  conn_str = (
+      "DRIVER={ODBC Driver 17 for SQL Server};"
+      "SERVER=elt-world-bank.database.windows.net;"
+      "DATABASE=ELT;"
+      "UID=CloudSA648a5ceb;"
+      "PWD=Urno9@$$;"
+   )
+
+   try:
+      conn = pyodbc.connect(conn_str)
+      print("✅ Connection successful!")
+   except Exception as e:
+      print("❌ Connection failed:")
+      print(e)
+# debt_data_extraction.py
+
+import wbgapi as wb
+import pandas as pd
+import logging
+from datetime import datetime
+import os
+
+# Setup logging
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "debt_data_extraction.log")
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+def extract_debt_data():
+    try:
+        logging.info("Starting debt data extraction")
+
+        # Set database (WDI)
+        wb.db = 2
+
+        # Indicator for Central government debt, % of GDP
+        indicator = 'GC.DOD.TOTL.GD.ZS'
+
+        # Get High Income Country members
+        countries = wb.region.members('HIC')
+
+        # Get data (entire time range available)
+        df = wb.data.DataFrame(indicator, economy=countries, labels=True, time=range(2000, 2024))
+
+        # Optional: Clean column names
+        df.reset_index(inplace=True)
+        df.rename(columns={
+            'economy': 'Country Code',
+            'country': 'Country',
+            'time': 'Year',
+            indicator: 'Debt (% of GDP)'
+        }, inplace=True)
+
+        # Save data to CSV
+        output_dir = "data"
+        os.makedirs(output_dir, exist_ok=True)
+        filename = f"debt_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        df.to_csv(os.path.join(output_dir, filename), index=False)
+
+        logging.info(f"Data extraction completed successfully. File saved as {filename}")
+
+    except Exception as e:
+        logging.error(f"Error during data extraction: {str(e)}")
+
+# Run
+extract_debt_data()
+
+# Scheduling
+!pip install schedule
+import schedule
+import time
+
+# Schedule to run once daily
+schedule.every().day.at("09:00").do(extract_debt_data)
+
+while True:
+    schedule.run_pending()
+    time.sleep(60)
+
+# Step Five: Create Power BI Dashboards
+  #In Power BI Desktop:
+
+   #Go to Home > Get Data > SQL Server.
+   #Use these:
+   #Server: elt-world-bank.database.windows.net
+   #Database: ELT
+   #Credentials: Username & Password you used in Python.
+
+  #Load the debt_percent_gdp table.
+
+   #Suggested visuals:
+    #Line chart: Country debt over time
+    #Map: Debt by country in a selected year
+    #Slicer: Year selector
+
+
+# Step Six: Automation Using cron
+ #Installing WSL
+  wsl --install
+ #Run WSL
+  crontab -e
+ #CRON JOB
+  0 8 * * * /mnt/c/Users/aleen/venv/Scripts/python.exe /mnt/c/Users/aleen/venv/Scripts/elt_pipeline.py >> /mnt/c/Users/aleen/venv/Scripts/elt_pipeline.log 2>&1
+  # to verify its running
+    crontab -l
+# Bonus: Email Alerts on Cron Failure in WSL
+ #Install mailutils 
+  sudo apt update
+  sudo apt install mailutils
+ #Configure Cron to Send Mail
+  sudo nano /etc/postfix/main.cf
+    # Postfix Main Configuration File for Gmail SMTP Relay
+
+     # Basic settings
+       smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+       biff = no
+       append_dot_mydomain = no
+       readme_directory = no
+       compatibility_level = 3.6
+
+     # TLS settings (using default snakeoil certs for now)
+       smtpd_tls_cert_file = /etc/ssl/certs/ssl-cert-snakeoil.pem
+       smtpd_tls_key_file = /etc/ssl/private/ssl-cert-snakeoil.key
+       smtpd_tls_security_level = may
+       smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+       smtp_tls_CApath = /etc/ssl/certs
+
+     # Enabling TLS and authentication for Gmail relay
+       smtp_use_tls = yes
+       smtp_tls_security_level = may
+       smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+       smtp_sasl_auth_enable = yes
+       smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+       smtp_sasl_security_options = noanonymous
+
+     # Gmail SMTP relay configuration
+       relayhost = [smtp.gmail.com]:587
+
+     # Myhostname and origin
+       myhostname = AleenaPC.localdomain
+       myorigin = /etc/mailname
+
+     # Alias maps
+       alias_maps = hash:/etc/aliases
+       alias_database = hash:/etc/aliases
+
+     # Mail relay rules
+       smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+
+
+     # --- Additional Configuration Files ---
+
+     # /etc/postfix/sasl_passwd
+     # [smtp.gmail.com]:587 your.email@gmail.com:your_app_password
+
+     # Replace with your actual email and App Password (if 2FA is enabled)
+
+  sudo nano /etc/postfix/sasl_passwd
+      smtp.gmail.com:587    your.email@gmail.com:your_app_password
+  sudo postmap /etc/postfix/sasl_passwd
+  sudo chown root:root /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
+  sudo chmod 600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.db
+      relayhost = smtp.gmail.com:587
+      smtp_sasl_auth_enable = yes
+      smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+      smtp_sasl_security_options = noanonymous
+      smtp_tls_security_level = may
+      smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+  sudo service postfix restart
+ #Test mail to sending:
+   echo "Test mail from postfix" | mail -s "Postfix Test" your.email@gmail.com
+
+# Bonus: Integrating a Machine Learning Model
+  #Case: Forecasting Debt Percent GDP
+    import pandas as pd
+     
+     print(df.columns.tolist())
+     # Filter for Germany and the right indicator
+       df_germany = df[
+           (df["Country Name"] == "Germany") &
+           (df["Indicator Name"].str.contains("Debt", case=False))
+       ].copy()
+
+     # Convert year columns into rows
+       df_germany_melted = df_germany.melt(
+           id_vars=["Country Name", "Indicator Name"],
+           value_vars=[str(year) for year in range(1990, 2025)],
+           var_name="Year",
+           value_name="DebtPercentGDP"
+        )
+
+     # Clean the data
+          df_germany_melted.dropna(subset=["DebtPercentGDP"], inplace=True)
+          df_germany_melted["Year"] = df_germany_melted["Year"].astype(int)
+          df_germany_melted["DebtPercentGDP"] = pd.to_numeric(df_germany_melted["DebtPercentGDP"], errors="coerce")
+       
+       from sklearn.linear_model import LinearRegression
+       import numpy as np
+
+     # Prepare features and labels
+       X = df_germany_melted["Year"].values.reshape(-1, 1)
+       y = df_germany_melted["DebtPercentGDP"].values
+
+       model = LinearRegression()
+       model.fit(X, y)
+
+     # Forecast next 5 years
+       future_years = np.array(range(2024, 2029)).reshape(-1, 1)
+       predictions = model.predict(future_years)
+
+       forecast_df = pd.DataFrame({
+          "Country": "Germany",
+          "Year": future_years.flatten(),
+          "PredictedDebtPercentGDP": predictions
+        })
+     # Save to CSV
+       forecast_df.to_csv("forecast_debt_germany.csv", index=False)
+
+     # Combining with actual data to show both historical & forcast debt:
+       actual_df = df_germany_melted[["Year", "DebtPercentGDP"]].copy()
+       actual_df.rename(columns={"DebtPercentGDP": "Value"}, inplace=True)
+       actual_df["Type"] = "Actual"
+
+       forecast_df.rename(columns={"PredictedDebtPercentGDP": "Value"}, inplace=True)
+       forecast_df["Type"] = "Forecast"
+
+       combined_df = pd.concat([actual_df, forecast_df], ignore_index=True)
+       combined_df.to_csv("actual_vs_forecast_debt.csv", index=False)
+
+
