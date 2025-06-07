@@ -26,7 +26,7 @@ The data used in this project is sourced from the World Bank's historical loan d
 # 📈 Key Concepts
 
 * **Data Source:** [World Bank Finance Data API](mailto:supphttps://data.worldbank.org/indicator/GC.DOD.TOTL.GD.ZSort@readme.io)
-* **Storage:**Azure SQL Storage for intermediate staging of extracted and transformed data.
+* **Storage:** Azure SQL Storage for intermediate staging of extracted and transformed data.
 * **Database:** Azure SQL Database (MSSQL) for the final storage of cleaned data.
 * **Transformation:** Data cleaning, manipulation, and feature engineering using Pandas.
 * **Orchestration:** Task scheduling and automation using cron jobs.
@@ -35,7 +35,7 @@ The data used in this project is sourced from the World Bank's historical loan d
 
 * **cron jobs:** Manages the orchestration and automation of the ELT pipeline.
 * **Pandas:** Used for data transformation, cleaning, and enrichment.
-* **Azure Services*
+* **Azure Services**
   **SQL Database:** Loads & Stores transformed data for analysis.
 * **Power BI:** For Visualization
 * **.env (python-dotenv):** For Configurations
